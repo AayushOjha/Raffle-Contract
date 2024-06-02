@@ -2,16 +2,14 @@
 pragma solidity ^0.8.24;
 
 // imports
-import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
-import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
+import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 
 // errors
 error Raffle__LessThanEntryFee();
 
-contract Raffle is VRFConsumerBaseV2, ConfirmedOwner {
+contract Raffle is VRFConsumerBaseV2Plus {
     // State variables
-    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     uint256 private immutable i_entry_fee;
     address payable[] private s_participants;
     uint64 private immutable i_subscription_id;
@@ -25,11 +23,17 @@ contract Raffle is VRFConsumerBaseV2, ConfirmedOwner {
         bool exists; // whether a requestId exists
         uint256[] randomWords;
     }
-    //TODO: make it private
-    mapping(uint256 => RequestStatus) public s_requests;
+    //? do i need them?
+    uint256[] public requestIds;
+    uint256 public lastRequestId;
+    mapping(uint256 => RequestStatus)
+        public s_requests; /* requestId --> requestStatus */
 
     // events
     event RaffleEnter(address indexed participant);
+
+    event RequestSent(uint256 requestId, uint32 numWords);
+    event RequestFulfilled(uint256 requestId, uint256[] randomWords);
 
     // constructor
     constructor(
@@ -38,8 +42,7 @@ contract Raffle is VRFConsumerBaseV2, ConfirmedOwner {
         uint64 subscriptionId,
         bytes32 gasLane,
         uint32 callbackGasLimit
-    ) VRFConsumerBaseV2(vrfCoordinatorV2) ConfirmedOwner(msg.sender) {
-        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
+    ) VRFConsumerBaseV2Plus(vrfCoordinatorV2) {
         i_entry_fee = entryFee;
         i_subscription_id = subscriptionId;
         i_gas_lane = gasLane;
@@ -73,22 +76,46 @@ contract Raffle is VRFConsumerBaseV2, ConfirmedOwner {
         returns (uint256 requestId)
     {
         // Will revert if subscription is not set and funded.
-        requestId = i_vrfCoordinator.requestRandomWords(
-            i_gas_lane,
-            i_subscription_id,
-            REQUEST_CONFIRMATIONS,
-            i_callback_gas_limit,
-            NUM_WORDS
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: i_gas_lane,
+                subId: i_subscription_id,
+                requestConfirmations: REQUEST_CONFIRMATIONS,
+                callbackGasLimit: 100000,
+                numWords: NUM_WORDS,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: false})
+                )
+            })
         );
+
+        s_requests[requestId] = RequestStatus({
+            randomWords: new uint256[](0),
+            exists: true,
+            fulfilled: false
+        });
+        requestIds.push(requestId);
+        lastRequestId = requestId;
+        emit RequestSent(requestId, NUM_WORDS);
+
         return requestId;
     }
 
     function fulfillRandomWords(
         uint256 _requestId,
-        uint256[] memory _randomWords
+        uint256[] calldata _randomWords
     ) internal override {
         require(s_requests[_requestId].exists, "request not found");
         s_requests[_requestId].fulfilled = true;
         s_requests[_requestId].randomWords = _randomWords;
+        emit RequestFulfilled(_requestId, _randomWords);
+    }
+
+    function getRequestStatus(
+        uint256 _requestId
+    ) public view returns (bool fulfilled, uint256[] memory randomWords) {
+        require(s_requests[_requestId].exists, "request not found");
+        RequestStatus memory request = s_requests[_requestId];
+        return (request.fulfilled, request.randomWords);
     }
 }
