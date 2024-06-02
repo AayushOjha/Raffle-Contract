@@ -12,7 +12,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     // State variables
     uint256 private immutable i_entry_fee;
     address payable[] private s_participants;
-    uint64 private immutable i_subscription_id;
+    uint256 private immutable i_subscription_id;
     bytes32 private immutable i_gas_lane;
     uint32 private immutable i_callback_gas_limit;
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
@@ -39,7 +39,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     constructor(
         address vrfCoordinatorV2,
         uint256 entryFee,
-        uint64 subscriptionId,
+        uint256 subscriptionId,
         bytes32 gasLane,
         uint32 callbackGasLimit
     ) VRFConsumerBaseV2Plus(vrfCoordinatorV2) {

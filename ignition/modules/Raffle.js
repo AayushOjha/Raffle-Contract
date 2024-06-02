@@ -16,10 +16,10 @@ module.exports = buildModule("TestModule", (m) => {
   } else {
     // constructor arguments
     const vrfCoordinatorV2 = networkConfig[chainId].vrfCoordinator;
-    const entryFee = hre.ethers.parseEther("0.01");
+    const entryFee = hre.ethers.parseEther("0.001");
     const subscriptionId = process.env.VRF_SUB_ID;
     const gasLane = networkConfig[chainId].keyHash;
-    const callbackGasLimit = 100000;
+    const callbackGasLimit = 9000000;
 
     const Raffle = m.contract("Raffle", [vrfCoordinatorV2, entryFee, subscriptionId, gasLane, callbackGasLimit]);
 
