@@ -5,7 +5,7 @@ const {
   developmentChains,
 } = require("../../utils/hardhat-config-helper");
 
-module.exports = buildModule("TestModule", (m) => {
+module.exports = buildModule("TestV5Module", (m) => {
   const chainId = network.config.chainId;
 
   if (developmentChains.includes(chainId)) {
